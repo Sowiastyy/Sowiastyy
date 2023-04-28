@@ -1,6 +1,6 @@
 <h1 align="center">👋 Welcome 👋</h1>
 
-<h4> I'm just a regular everyday normal 👨‍💻programmer👨‍💻 with passion for programming in script languages </h4>
+<h4 align="center"> I'm just a regular everyday normal 👨‍💻programmer👨‍💻 with passion for programming in script languages </h4>
 
 <h3 align="center">⌨️ Languages ⌨️</h3>
 <p align="center">  
