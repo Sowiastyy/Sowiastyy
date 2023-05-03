@@ -1,7 +1,7 @@
 <h1 align="center">👋 Welcome 👋</h1>
 
 <h4 align="center"> I'm just a regular everyday normal 👨‍💻programmer👨‍💻 with passion for programming in script languages </h4>
-
+<h5 align="center">Currently looking for 🧑‍💼intership/job.💼🧑‍</h5>
 <h3 align="center">⌨️ Languages ⌨️</h3>
 <p align="center">  
   <img src="https://img.shields.io/badge/python-3670A0?style=for-the-badge&logo=python&logoColor=ffdd54" />
