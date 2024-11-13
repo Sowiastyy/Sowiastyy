@@ -1,6 +1,8 @@
 <h1 align="center">👋 Welcome 👋</h1>
-
-<h4 align="center"> I'm just a regular everyday normal 👨‍💻programmer👨‍💻 with passion for programming in script languages </h4>
+<p align="center">  
+  <img width="120" src="https://github.com/Sowiastyy/Sowiastyy/blob/main/OwlEveryday.gif" />
+</p>
+<h4 align="center"> I'm just a regular everyday normal 👨‍💻programmer👨‍💻 </h4>
 <h5 align="center">Currently looking for 🧑‍💼intership/job.💼🧑‍</h5>
 <h3 align="center">⌨️ Languages ⌨️</h3>
 <p align="center">  
