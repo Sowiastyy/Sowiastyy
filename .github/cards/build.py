@@ -278,9 +278,10 @@ def headlab_card(stats: dict) -> list[Image.Image]:
         x = put_text(d, 12, 10, "HEAD ", INK, PX_BIG)
         put_text(d, x, 10, "LAB", GREEN, PX_BIG)
         put_text(d, 12, 26, "PAINT PLAYER HEADS IN-GAME · FABRIC", MUTED)
-        d.rectangle([232, 8, 240, 16], fill=(40, 40, 56), outline=INK)
-        put_text(d, 235, 10, "K", INK)
-        put_text(d, 245, 10, "OPEN EDITOR", MUTED)
+        # K's ink is 4px wide, one pixel in from the pen: 8px inside the keycap leaves 2px either side
+        d.rectangle([232, 8, 241, 16], fill=(40, 40, 56), outline=INK)
+        put_text(d, 234, 10, "K", INK)
+        put_text(d, 246, 10, "OPEN EDITOR", MUTED)
 
         # the editor's net, filling in texel by texel, and its palette with the colour in hand
         for name, ((tx, ty), *_rest) in FACES.items():
@@ -535,11 +536,7 @@ def fleet_frame(t: Term, f: int, cols: int, st: dict) -> None:
         t.spinner(24, 10, f)
         t.spans(26, 10, [(verb, ACCENT), (f" ({secs}s · ↑ {tokens:.1f}k tokens)", FL_MUTED)])
 
-    # the status line: keys on the left, the repo's numbers on the right
-    t.spans(2, 12, [
-        ("[F10]", TEXT), (" LEAVE FOCUS   ", FL_MUTED), ("F1-F9", TEXT), (" session   ", FL_MUTED),
-        ("F11", TEXT), (" new", FL_MUTED),
-    ])
+    # the status line carries the repo's numbers, centred
     gap = ("   ", FL_MUTED)
     numbers = [
         (str(st["stars"]), TEXT), (" star" + "s" * (st["stars"] != 1), FL_MUTED), gap,
@@ -547,7 +544,7 @@ def fleet_frame(t: Term, f: int, cols: int, st: dict) -> None:
         ("↓ ", ACCENT), (compact(st["downloads"]), TEXT), (" downloads", FL_MUTED), gap,
         (str(st["releases"]), TEXT), (" releases", FL_MUTED),
     ]
-    col = right - 1 - (2 + sum(len(s) for s, _ in numbers))
+    col = (cols - (2 + sum(len(s) for s, _ in numbers))) // 2
     t.star(col, 12, BUSY)
     t.spans(col + 2, 12, numbers)
 
