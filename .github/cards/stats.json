@@ -1,0 +1,18 @@
+{
+  "headlab": {
+    "followers": 2,
+    "mc": [
+      "1.20.2",
+      "26.3"
+    ],
+    "modrinth": 190,
+    "curseforge": 111
+  },
+  "fleet": {
+    "stars": 2,
+    "forks": 1,
+    "releases": 37,
+    "downloads": 67,
+    "latest": "v0.2.22"
+  }
+}
