@@ -18,6 +18,7 @@ import math
 import os
 import sys
 import urllib.request
+from collections import namedtuple
 from pathlib import Path
 
 from PIL import Image, ImageChops, ImageDraw, ImageFont
@@ -274,16 +275,19 @@ SIGHT, SIGHT_UP = (50, 44), 12  # how far a kin's sight lifts the night round hi
 # What happens, in frames of the loop (the flame's: nomads-sprites.json says how many, how long,
 # and when the woodcutter's log lands on the fire, STOKED):
 #   The woodcutter (kin 0) chops the cherry, a swing every CHOP_EVERY; at the second blow an
-#   apple drops onto the head of the man under it (kin 6); the fifth fells it (west, past him as
-#   he walks off: render/world/draw/tree.ts falls it in FALL_TIME), and its wood he takes up,
+#   apple drops onto the head of the man under it (kin 6); the fifth fells it (north-east, towards
+#   the camp and away from the man: render/world/draw/tree.ts falls it in FALL_TIME), and its wood he takes up,
 #   carries to the fire and throws on (ANIM.TOSS, the log's flight render/fx-tools.ts EV.STOKE): it flares up,
 #   STOKED floats up, and the flame grows, lazier, and burns down again by the loop's end.
 #   The archer (kin 1) gets up from the fire, walks out, draws as a bow is drawn (frames.ts
 #   ACTIONS.draw: 0, 0.2, 0.5 s, loosed at BOW_DRAW_TIME 0.8 s) at the apple on the man's head
 #   and hits the man; he goes back to his seat.
-#   The man, hurt, shows his HP bar (draw/kin.ts healthBar), walks to the fire, sits, eats the
-#   apple and heals by it (render/fx.ts EV.HEAL's heart), the bar filling, gone once he is whole;
-#   then back under his tree, which has grown again as a stump puts out a shoot in the game.
+#   The man, hit, flashes and is knocked back off his feet, the apple flying off his head: over onto
+#   his back, legs kicking under the stars, WHOOPS! (draw/kin.ts ANIM.TRIP, fx-tools.ts EV.TRIP),
+#   up again with a hop. He takes up his apple, shows his HP bar (draw/kin.ts healthBar), walks to
+#   the fire, sits, eats the apple and heals by it (render/fx.ts EV.HEAL's heart), the bar filling,
+#   gone once he is whole; then back under his tree, which has grown again as a stump puts out a
+#   shoot in the game.
 TREE_AT, TREE = (168, 77), "tree_3_2_0"  # the cherry, grown to its second size: it reads by night
 STUMP, LOGS = "stump_3_2", ["log_3_2_0", "log_3_2_1"]  # its stump, and its logs lying, + the way it fell
 FRUIT = (-9, -15)  # where its fruit hangs on its left side, from its foot
@@ -295,7 +299,7 @@ CHOP_FIRST, CHOP_EVERY, BLOWS = 2, 12, 5  # his first swing, a swing every so ma
 APPLE_BLOW = 1  # the blow that shakes the apple down (counting from 0)
 CHOP = [(0, "chop0"), (0.11, "chop1"), (0.2, "chop2"), (0.32, "chop3"), (0.5, "idle0")]  # ACTIONS.chop, ACTION_END
 FALL_TIME, UPRIGHT, GROUND_Y = 0.7, 0.81, 0.58  # draw/tree.ts; art/props/trees.ts
-FALL_DIR = 4  # west: 0 east, clockwise in eighths
+FALL_DIR = 7  # north-east, towards the camp: 0 east, clockwise in eighths
 LOG_ALONG = [14, 36]  # each log from the stump along the fall: LOG_GAP + logStep(2) * (i + 1/2)
 TOSS = [(0, "bend"), (0.175, "raise0"), (0.3, "raise1"), (0.5, "idle0")]  # ANIM.TOSS over TOSS_TIME
 LOG_FLIGHT, HAND_Z, LOG_SPIN, TOSS_FALL = 0.4, 16, 0.75, 260  # the thrown log: s in the air, from this high, turns, its fall
@@ -304,10 +308,19 @@ UP, WALK_OUT, DRAWS, WALK_BACK, SITS = 24, 26, 37, 55, 66
 DRAW_FRAMES = [(0, "draw0"), (0.2, "draw1"), (0.5, "draw2"), (0.8, "idle0")]
 BOW_HAND = (-6, -8)  # where the arrow leaves him, aiming west, from his feet
 ARROW_FLIGHT = 3  # frames
-# the man: hit, walks to the fire, sits, eats, heals, gets up, walks back
+# the man: hit and knocked off his feet, up again, takes up his apple, walks to the fire, sits,
+# eats it, heals, gets up, walks back
 MAN_HP, MAN_HIT_HP = 3, 1
-MAN_WALKS, MAN_SITS, HEARTS, MAN_UP, MAN_BACK = 56, 76, (84, 100), 112, 136
+KNOCK, KNOCK_TIME = 6, 0.25  # px the arrow knocks him back, away from the archer, and the s he slides
+HURT_FOR, HURT_TINT = 0.15, (0xFF, 0x70, 0x70)  # the hit's flash (draw/kin.ts HURT_TINT)
+DOWN_FOR = 1.6  # s off his feet, getting up included (ANIM.TRIP)
+TRIP_FALL, TRIP_RISE, KICK_STEP = 0.16, 0.3, 0.09  # draw/kin.ts: going over, getting up, a kick of his legs
+LYING_STARS = [(0, -15), (-4, -14), (-5, -12), (-4, -10), (0, -9)]  # draw/kin.ts, by sprite direction
+DUST, GRASS, WHOOPS = (0x69, 0x62, 0x5B), (0x8F, 0xC7, 0x64), (0xFF, 0xF0, 0xA0)  # C.groundLight, C.grassLight, C.goldLight
+APPLE_FLIGHT, APPLE_LANDS = 0.5, (-4, 7)  # the apple knocked off his head: s in the air, where it lands from where he does
+MAN_WALKS, MAN_SITS, HEARTS, MAN_UP, MAN_BACK = 74, 94, (100, 114), 124, 146
 APPLE_ON = {"stand": 12, "sit": 8}  # how high over his feet the apple sits on his head, standing and sitting
+APPLE_HELD = 2  # and its foot in his hands, held before him
 
 # Under the title how many play now, and lower down PLAY with a kinsman hopping on it as the
 # tribesmen on the game's loading curtain do (lobby/loading-row.ts and its hop-* keyframes):
@@ -435,6 +448,15 @@ def tree_state(f: int):
     return ("falling", k) if k < 1 else ("felled", 0.0)
 
 
+def log_at(i: int):
+    """Where log `i` of the felled cherry lies (0 by the stump), along the way it fell
+    (render/world/draw/tree.ts), and what it sorts by: its far edge."""
+    a = FALL_DIR * math.pi / 4
+    x = TREE_AT[0] + math.cos(a) * LOG_ALONG[i]
+    y = TREE_AT[1] + math.sin(a) * LOG_ALONG[i] * GROUND_Y
+    return round(x), round(y), round(y) - abs(math.sin(a)) * (LOG_ALONG[1] - LOG_ALONG[0]) / 2 * GROUND_Y - 4
+
+
 def woodcutter_plan(stoked: int) -> dict:
     """When the woodcutter does what after felling the tree, for the log to land at `stoked`."""
     fell = blow_frames()[-1]
@@ -448,7 +470,7 @@ def woodcutter_at(f: int, stoked: int):
     """The woodcutter in frame `f`: (x, y, sprite, mirrored, holding the log)."""
     p = woodcutter_plan(stoked)
     fell, pick, carry, toss, back, home = p["fell"], p["pick"], p["carry"], p["toss"], p["back"], p["home"]
-    lx, ly = TREE_AT[0] - LOG_ALONG[0], TREE_AT[1]
+    lx, ly, _ = log_at(0)
     if f < fell + 3:  # at the tree, swinging
         swing = (f - CHOP_FIRST) % CHOP_EVERY if f >= CHOP_FIRST else CHOP_EVERY
         frame = stepped(CHOP, secs(swing)) if swing < CHOP_EVERY else "idle0"
@@ -486,33 +508,82 @@ def looses() -> int:
     return DRAWS + frames_of(0.8)
 
 
-def man_at(f: int):
-    """The man under the tree in frame `f`: (x, y, sprite, mirrored, hit points)."""
-    hit = looses() + ARROW_FLIGHT
-    hp = MAN_HP if f < hit else MAN_HIT_HP + sum(1 for h in HEARTS if f >= h)
+Man = namedtuple("Man", "x y name flip hp lift tint lying")
+
+
+def man_hit() -> int:
+    """The frame the arrow strikes the man."""
+    return looses() + ARROW_FLIGHT
+
+
+def knocked():
+    """Where the arrow knocks the man (back from the archer, the way draw/kin.ts knocks a figure
+    back from whoever it faces), and where the apple it knocks off his head lands: before him."""
+    dx, dy = MAN_AT[0] - SHOT[0], MAN_AT[1] - SHOT[1]
+    n = math.hypot(dx, dy)
+    x, y = MAN_AT[0] + dx / n * KNOCK, MAN_AT[1] + dy / n * 0.6 * KNOCK
+    return (x, y), (x + APPLE_LANDS[0], y + APPLE_LANDS[1])
+
+
+def man_at(f: int) -> Man:
+    """The man under the tree in frame `f`."""
+    hit, (dx, dy) = man_hit(), knocked()[0]
+    up = hit + frames_of(DOWN_FOR)
+    hp = MAN_HP if f < hit else min(MAN_HP, MAN_HIT_HP + sum(1 for h in HEARTS if f >= h))
     breath = "idle0" if (f // 8) % 2 == 0 else "idle1"
-    if f < MAN_WALKS or f >= MAN_BACK:
-        return *MAN_AT, f"kin_6_{breath}_0", False, min(hp, MAN_HP)
+    if f < hit or f >= MAN_BACK:
+        return Man(*MAN_AT, f"kin_6_{breath}_0", False, hp, 0, None, False)
+    if f < up:
+        # off his feet, facing the archer: sliding back as he goes over backwards, on his back with
+        # his legs kicking, and up again (draw/kin.ts framing's ANIM.TRIP: a bounce as he lands, a
+        # hop as he gets up), flashing as the arrow strikes
+        at = secs(f - hit)
+        k = 1 - (1 - min(1.0, at / KNOCK_TIME)) ** 2
+        x, y = MAN_AT[0] + (dx - MAN_AT[0]) * k, MAN_AT[1] + (dy - MAN_AT[1]) * k
+        d, flip = facing(SHOT[0] - MAN_AT[0], SHOT[1] - MAN_AT[1])
+        lying = TRIP_FALL <= at <= DOWN_FOR - TRIP_RISE
+        frame = "trip0" if not lying else "trip1" if int(at / KICK_STEP) % 2 == 0 else "trip2"
+        landed = at - TRIP_FALL
+        bounce = math.sin(landed / 0.2 * math.pi) * 2 if 0 < landed < 0.2 else 0
+        hop = math.sin((DOWN_FOR - at) / TRIP_RISE * math.pi) * 3 if at > DOWN_FOR - TRIP_RISE else 0
+        tint = HURT_TINT if at < HURT_FOR else None
+        return Man(x, y, f"kin_6_{frame}_{d}", flip, hp, round(bounce + hop), tint, lying)
+    if f < MAN_WALKS:  # bending for his apple
+        ax, ay = knocked()[1]
+        d, flip = facing(ax - dx, ay - dy)
+        return Man(dx, dy, f"kin_6_bend_{d}", flip, hp, 0, None, False)
     if f < MAN_SITS:
-        return *walking(6, f, MAN_WALKS, MAN_SITS, MAN_AT, MAN_SEAT), hp
+        return Man(*walking(6, f, MAN_WALKS, MAN_SITS, (dx, dy), MAN_SEAT), hp, 0, None, False)
     if f < MAN_UP:
         d, flip = facing(FIRE[0] - MAN_SEAT[0], FIRE[1] - MAN_SEAT[1])
-        return *MAN_SEAT, f"kin_6_sit_{d}", flip, hp
-    return *walking(6, f, MAN_UP, MAN_BACK, MAN_SEAT, MAN_AT), hp
+        return Man(*MAN_SEAT, f"kin_6_sit_{d}", flip, hp, 0, None, False)
+    return Man(*walking(6, f, MAN_UP, MAN_BACK, MAN_SEAT, MAN_AT), hp, 0, None, False)
 
 
 def apple_at(f: int):
-    """Where the apple is in frame `f`, if it is: shaken down off the cherry at its blow, falling
-    onto the man's head, there until he eats it by the fire."""
-    drop = blow_frames()[APPLE_BLOW]
+    """Where the apple is in frame `f`, if it is, and what it sorts by: shaken down off the cherry
+    at its blow onto the man's head, knocked off it by the arrow and lying in the grass, then in
+    his hands to the fire, until he eats it there."""
+    drop, hit = blow_frames()[APPLE_BLOW], man_hit()
     if not drop <= f < HEARTS[0]:
         return None
-    mx, my, pose, _, _ = man_at(f)
-    head = my - APPLE_ON["sit" if "_sit_" in pose else "stand"]
-    hx, hy = TREE_AT[0] + FRUIT[0], TREE_AT[1] + FRUIT[1]
-    age = secs(f - drop)
-    y = min(head, hy + 130 * age * age)
-    return (hx + (mx - hx) * min(1.0, age / 0.3) if y < head else mx), y
+    man = man_at(f)
+    if f <= hit:  # falling onto his head, then on it
+        head = man.y - APPLE_ON["stand"]
+        hx, hy = TREE_AT[0] + FRUIT[0], TREE_AT[1] + FRUIT[1]
+        age = secs(f - drop)
+        y = min(head, hy + 130 * age * age)
+        return (hx + (man.x - hx) * min(1.0, age / 0.3) if y < head else man.x), y, man.y + 0.2
+    if f < MAN_WALKS:  # knocked off in an arc (render/fx.ts toss), then in the grass before him
+        (lx, ly), t = knocked()[1], secs(f - hit)
+        u = min(1.0, t / APPLE_FLIGHT)
+        z0 = APPLE_ON["stand"]
+        z = max(0.0, z0 + (TOSS_FALL * APPLE_FLIGHT / 2 - z0 / APPLE_FLIGHT) * t - TOSS_FALL * t * t / 2)
+        gy = MAN_AT[1] + (ly - MAN_AT[1]) * u
+        return MAN_AT[0] + (lx - MAN_AT[0]) * u, gy - z, gy
+    if f < MAN_SITS:  # held before him as he walks
+        return man.x + (-4 if man.flip else 4), man.y - APPLE_HELD, man.y + 0.2
+    return man.x + 4, man.y - APPLE_HELD, man.y + 0.2
 
 
 def nm_ground() -> Image.Image:
@@ -584,11 +655,17 @@ def nm_scene(sheet: Sheet, ground: Image.Image, f: int) -> Image.Image:
     figure(x, y, name, flip)
     if holding:  # the log in his arms, over his front
         stand.append((y + 0.1, lambda x=x, y=y: sheet.put(im, "stoke_log", x, y - 9)))
-    x, y, name, flip, _ = man_at(f)
-    figure(x, y, name, flip)
+    man = man_at(f)
+    sheet.put(im, "shadow_m", man.x, man.y)
+    stand.append((man.y, lambda: sheet.put(im, man.name, man.x, man.y - man.lift, man.flip, man.tint)))
+    if man.lying:  # stars circling over his head (draw/kin.ts dazed)
+        sx, sy = LYING_STARS[int(man.name[-1])]
+        stars = f"stun_{int(secs(f) * 10) % 4}"
+        stand.append((man.y + 0.1, lambda: sheet.put(im, stars, man.x + (-sx if man.flip else sx), man.y - man.lift + sy)))
     apple = apple_at(f)
-    if apple:  # over him: falling onto his head, then on it
-        stand.append((y + 0.2, lambda: sheet.put(im, "apple", *apple)))
+    if apple:
+        ax, ay, by = apple
+        stand.append((by, lambda: sheet.put(im, "apple", ax, ay)))
     # the cherry: shaken by the axe, falling, or a stump with its logs (until he takes them up)
     state, k = tree_state(f)
     tx, ty = TREE_AT
@@ -608,8 +685,9 @@ def nm_scene(sheet: Sheet, ground: Image.Image, f: int) -> Image.Image:
             turned = sheet.turned(tree, math.degrees(math.atan2(fx, -fy)), max(0.2, math.hypot(fx, fy)))
             stand.append((ty, lambda: sheet.put(im, turned, tx, ty)))
         elif f < plan["carry"]:  # its logs, until he takes them up
-            for log, along in zip(LOGS, LOG_ALONG):
-                stand.append((ty, lambda log=log, along=along: sheet.put(im, f"{log}_{FALL_DIR}", tx - along, ty)))
+            for i, log in enumerate(LOGS):
+                lx, ly, by = log_at(i)
+                stand.append((by, lambda log=log, lx=lx, ly=ly: sheet.put(im, f"{log}_{FALL_DIR}", lx, ly)))
     stand.append((FIRE[1], lambda: sheet.put(im, "campfire", *FIRE)))
     stand.append((FIRE[1] + 0.5, lambda: sheet.put(im, f"flame_{f}", FIRE[0], FIRE[1] - 1)))
     king = f"king_idle{f * KING_IDLE // NM_FRAMES}_{KING_DIR}"
@@ -674,9 +752,15 @@ def nm_effects(sheet: Sheet, im: Image.Image, f: int) -> None:
     for b in blow_frames():
         burst(im, f, b, (tx, ty - 6), 4, 55, 60, 0.5, (196, 150, 92), 51)  # fx_chip, fx_splinter
     fell = blow_frames()[-1] + frames_of(FALL_TIME)
-    burst(im, f, fell, (tx - 30, ty), 14, 60, 50, 0.9, BLOSSOM, 52, 40)  # EV.TREE_FELL: its leaves
+    a = FALL_DIR * math.pi / 4  # EV.TREE_FELL: its leaves, where its crown came down
+    burst(im, f, fell, (tx + math.cos(a) * 30, ty + math.sin(a) * 30 * GROUND_Y), 14, 60, 50, 0.9, BLOSSOM, 52, 40)
+    # the man landing on his back (fx-tools.ts EV.TRIP): dust and grass
+    lands, (dx, dy) = man_hit() + frames_of(TRIP_FALL), knocked()[0]
+    burst(im, f, lands, (dx, dy), 8, 40, 20, 0.6, DUST, 56, 60)
+    burst(im, f, lands, (dx, dy - 2), 4, 35, 45, 0.5, GRASS, 57)
     lit = im.convert("RGBA")
-    mx, my, _, _, hp = man_at(f)
+    man = man_at(f)
+    mx, my, hp = man.x, man.y, man.hp
     # the arrow at the apple, into the man
     loose = looses()
     hit = loose + ARROW_FLIGHT
@@ -690,7 +774,8 @@ def nm_effects(sheet: Sheet, im: Image.Image, f: int) -> None:
     if hit <= f and hp < MAN_HP:
         d = ImageDraw.Draw(lit)
         w = MAN_HP * 2
-        left, top = round(mx - w / 2), round(my - 25)
+        # lower over him lying or sitting, so it hangs over him and not over the kin behind
+        left, top = round(mx - w / 2), round(my - (19 if man.lying else 21 if "_sit_" in man.name else 25))
         d.rectangle([left - 1, top, left + w, top + 2], fill=(*OUTLINE, 255))
         d.rectangle([left, top + 1, left + round(w * hp / MAN_HP) - 1, top + 1], fill=(*HEAL, 255))
     for h in HEARTS:  # EV.HEAL: a heart rising from over his head
@@ -708,6 +793,9 @@ def nm_effects(sheet: Sheet, im: Image.Image, f: int) -> None:
         z = HAND_Z + (TOSS_FALL * LOG_FLIGHT / 2 - HAND_Z / LOG_FLIGHT) * t - TOSS_FALL * t * t / 2
         log = sheet.turned("stoke_log", 360 * LOG_SPIN * u)
         sheet.put(lit, log, x, y - z)
+    age = secs(f - lands)
+    if 0 <= age < 1.1 and (age < 0.7 or (f - lands) % 2 == 0):  # WHOOPS! floats up and fades
+        sheet.text(lit, "WHOOPS!", dx, dy - 28 - 14 * age, WHOOPS)
     im.paste(lit.convert("RGB"))
     hit_at = (MAN_AT[0], MAN_AT[1] - 9)
     burst(im, f, hit, hit_at, 3, 45, 50, 0.5, (176, 32, 40), 53)  # EV.HIT's blood
