@@ -1,6 +1,6 @@
+<a href="https://nomads.sowiasty.dev"><img src="https://raw.githubusercontent.com/Sowiastyy/Sowiastyy/cards/nomads.gif" width="100%" alt="Nomads: a tribe sitting round a campfire at night with their king beside them on his horse, a rabbit that comes up to a tuft of grass and the archer who walks up, shoots it and picks up its meat, and a kinsman hopping on the PLAY button under how many play now"></a>
+
 <p align="center">
-  <a href="https://nomads.sowiasty.dev"><img alt="Nomads: players online" src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fnomads.sowiasty.dev%2Fstatus&query=%24.players&label=nomads&suffix=%20playing%20now&color=f2c94c&labelColor=13131c&style=flat-square"></a>
-  <a href="https://nomads.sowiasty.dev"><img alt="Nomads: open rooms" src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fnomads.sowiasty.dev%2Fstatus&query=%24.rooms&label=open%20rooms&color=f2c94c&labelColor=13131c&style=flat-square"></a>
   <a href="https://discord.gg/QE3fhBa5s"><img alt="Nomads Discord members" src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fdiscord.com%2Fapi%2Fv9%2Finvites%2FQE3fhBa5s%3Fwith_counts%3Dtrue&query=%24.approximate_member_count&label=discord&color=5865f2&labelColor=13131c&style=flat-square"></a>
 </p>
 

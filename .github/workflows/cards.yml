@@ -2,7 +2,8 @@ name: cards
 
 on:
   schedule:
-    - cron: "17 4 * * *"
+    - cron: "17 4 * * *" # every card, with the day's numbers
+    - cron: "47 * * * *" # Nomads' card alone: how many play now
   workflow_dispatch:
   push:
     branches: [main]
@@ -14,6 +15,9 @@ on:
 permissions:
   contents: write
 
+# an hourly run and the daily one never push over each other
+concurrency: cards
+
 jobs:
   cards:
     runs-on: ubuntu-latest
@@ -23,11 +27,22 @@ jobs:
         with:
           python-version: "3.13"
       - run: pip install -r .github/cards/requirements.txt
-      - name: Redraw Head Lab and claude-fleet with today's numbers
-        run: python .github/cards/build.py
+      - name: Redraw the cards with the numbers as they are now
+        run: python .github/cards/build.py ${{ github.event.schedule == '47 * * * *' && '--nomads' || '' }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # Nomads' card changes with every count, every hour: it lives alone on the cards branch, one
+      # commit pushed over the last, so the counts leave no history behind in this repository
+      - name: Publish Nomads' card on the cards branch
+        run: |
+          blob=$(git hash-object -w assets/nomads.gif)
+          if git fetch -q --depth=1 origin cards 2>/dev/null && [ "$(git rev-parse FETCH_HEAD:nomads.gif)" = "$blob" ]; then echo "nomads: nothing new"; exit 0; fi
+          tree=$(printf '100644 blob %s\tnomads.gif\n' "$blob" | git mktree)
+          commit=$(git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+            commit-tree "$tree" -m "Nomads card")
+          git push -f origin "$commit:refs/heads/cards"
       - name: Commit the cards if a number moved
+        if: github.event.schedule != '47 * * * *'
         run: |
           git add assets .github/cards/stats.json
           if git diff --cached --quiet; then echo "nothing new"; exit 0; fi
