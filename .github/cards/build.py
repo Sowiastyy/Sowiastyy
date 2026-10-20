@@ -227,75 +227,105 @@ def save_gif(frames: list[Image.Image], path: Path, ms: int, palette: Image.Imag
 # ---------------------------------------------------------------- Nomads
 
 # The game's own sprites, which the game draws in code: src/nomads-sprites.png and
-# its frame table are written by the game's scripts/profile-sprites.ts (`npm run
-# profile-sprites` in the game, then copy dist/profile/* here, when its art changes).
-# The flame is the campfire's automaton, NM_FRAMES steps of it that loop; the light is
-# the game's night (render/light.ts) and its campfire glow (render/world/fire.ts).
-NM_MS = 70  # about the game's 15 flame steps a second
-NM_FRAMES = 120  # as exported: room in the loop for the rabbit
-G = 4  # the scene's game pixels to a GIF pixel; the text keeps the cards' S
-NM_W, NM_H = W * S // G, 120 * S // G  # 240 x 90 game pixels
-FIRE = (164, 50)  # the campfire's foot
+# its table (nomads-sprites.json: the sprites, and the flame's loop) are written by
+# the game's scripts/profile-sprites.ts (`npm run profile-sprites` in the game, then
+# copy dist/profile/* here, when its art changes). The flame is the campfire's
+# automaton through the loop; the light is the game's night (render/light.ts) and its
+# campfire glow (render/world/fire.ts); what happens is the game's own, timed as it
+# times it (render/world/draw/kin.ts, tree.ts, items.ts; render/fx.ts).
+# the loop: as long as the flame's, in frames as long as its
+NM_FLAME = json.loads((SRC / "nomads-sprites.json").read_text())["flame"]
+NM_FRAMES, NM_MS = NM_FLAME["frames"], NM_FLAME["ms"]
+G = 3  # the scene's game pixels to a GIF pixel, as the text's
+NM_W, NM_H = W * S // G, 120 * S // G  # 320 x 120 game pixels
+FIRE = (232, 70)  # the campfire's foot
 MEADOW = [(0x6A, 0x9D, 0x47), (0x5B, 0x8F, 0x3D), (0x4D, 0x7C, 0x34), (0x3F, 0x6A, 0x2B)]
 NIGHT_FOG = (56, 64, 106)  # the game's night sky dimmed, a little less than its fog of war
 LAMPLIGHT = (240, 206, 178)  # what the tribe sees by at night: the night sky lifted towards the fire's warmth
 POOL = (78, 38)  # how far the fire lights the ground either way, flattened as the ground is seen
+STOKED_LIGHT = 1.25  # a stoked fire's light reaches this much further (render/world/draw/items.ts)
 GLOW_TINT, GLOW = (255, 138, 42), 0.42
-FLAME_TALL = 22  # as exported
 KING_IDLE = 4  # the king's horse breathing: its idle frames, as exported
 # a spark cools through the fire's own colours (art/sprites/items.ts FIRE_RAMP)
 EMBER = [(0xFF, 0xFB, 0xE8), (0xFF, 0xF0, 0x7A), (0xFF, 0xC4, 0x3C), (0xF7, 0xA5, 0x31), (0xD9, 0x50, 0x2F), (0x9C, 0x2C, 0x1F)]
+OUTLINE, HEAL, MEAT_LIGHT = (0x1E, 0x1A, 0x24), (0xE0, 0x54, 0x6A), (0xE0, 0x6A, 0x5A)  # art/palette.ts C
 
 # the menu's look (client/index.html): gold title, green PLAY with a darker lip under it
 GOLD, NM_INK, NM_SUB = (242, 201, 76), (30, 26, 36), (200, 192, 176)
 PLAY_UP, PLAY_DOWN, PLAY_LIP = (116, 184, 58), (134, 201, 74), (70, 117, 34)
-# the tribe sitting round the back half of the fire, open to the viewer: which kin (as
-# exported), where, which way it faces (0 south .. 4 north, the game's), mirrored
-CIRCLE = [
-    (4, 150, 41, 1, False),
-    (3, 178, 40, 1, True),
-]
-KING_AT, KING_DIR = (198, 58), 2  # the king on his horse, side on, facing west (east mirrored): to the fire
+PLAY_SPACING = 2  # px between its letters, as the menu spaces them
+# the ring sitting round the back of the fire, open to the viewer: which kin (as exported),
+# where, which way it faces (0 south .. 4 north, the game's), mirrored
+CIRCLE = [(4, 218, 61, 1, False), (3, 246, 60, 1, True)]
+KING_AT, KING_DIR = (266, 78), 2  # the king on his horse, side on, facing west (east mirrored): to the fire
 TREES = [  # name, x, y: a dark wood round the glade, thickest behind the camp
-    ("tree_1_3_1", 230, 36), ("tree_0_2_1", 138, 28), ("tree_2_2_3", 170, 20), ("tree_3_2_0", 112, 22),
-    ("tree_1_2_2", 204, 26), ("tree_0_2_2", 84, 16), ("tree_1_2_0", 56, 12), ("tree_0_1_2", 26, 14),
-    ("tree_1_1_1", 234, 80),
+    ("tree_1_3_1", 316, 44), ("tree_0_2_1", 200, 34), ("tree_2_2_3", 232, 26), ("tree_3_2_0", 176, 28),
+    ("tree_1_2_2", 270, 32), ("tree_0_2_2", 136, 22), ("tree_1_2_0", 104, 16), ("tree_0_1_2", 70, 18),
+    ("tree_1_1_1", 306, 104), ("tree_2_2_0", 300, 70),
 ]
-TUFTS = [("grass_tall_1_0", 122, 46), ("grass_tall_0_2", 186, 72), ("grass_tall_0_1", 156, 80), ("grass_short_0_1", 176, 66),
-         ("grass_short_0_0", 132, 40), ("grass_short_0_2", 214, 50), ("grass_tall_0_0", 214, 84)]
-FIREFLIES = [(96, 14, 0), (118, 52, 1), (226, 10, 2), (92, 40, 3), (226, 64, 4)]  # where each drifts about
-
-# The archer, the lowest of the ring, and a rabbit that comes up out of the dark off to the side to
-# a tuft of grass. He stands, walks a few steps towards it, draws as a bow is drawn in the game
-# (art/figures/frames.ts ACTIONS.draw: 0, 0.2, 0.5 s, the arrow loosed at BOW_DRAW_TIME, 0.8 s) and
-# shoots it; it leaves its meat, which he walks over to and picks up as a kin picks up what lies
-# about (the bend, PICKUP_TIME), and he walks back to his seat. His sight lifts the night round him
-# as a kin's does (render/light.ts). Frames of the loop.
-ARCHER = 1
-SEAT, SHOT, PICK_AT = (140, 58), (126, 66), (110, 75)  # where he sits, shoots from, bends for the meat
-RABBIT_FROM, RABBIT_AT = (72, 92), (104, 76)  # out of the dark at the bottom, up to the grass
-GRASS_AT = (97, 77)
-RABBIT_IN, RABBIT_SITS = 12, 40
-UP, WALK_OUT, DRAWS, LOOSES, HITS, WALK_ON, BENDS, TAKEN, WALK_BACK, SITS = 44, 47, 53, 64, 67, 72, 78, 80, 82, 94
-DRAW_FRAMES = [(0, "draw0"), (3, "draw1"), (7, "draw2")]  # from DRAWS: 0, 0.2, 0.5 s
-WALK_STEP = 0.12  # s a walking frame (render/world/draw/kin.ts)
-BOW_HAND = (-6, -8)  # where the arrow leaves him, aiming, from his feet
-SIGHT = (56, 30)  # how far his sight lifts the night round him, flattened as the ground is seen
+TUFTS = [("grass_tall_1_0", 196, 92), ("grass_tall_0_2", 254, 98), ("grass_tall_0_1", 226, 106), ("grass_short_0_1", 248, 88),
+         ("grass_short_0_0", 200, 52), ("grass_short_0_2", 286, 60), ("grass_tall_0_0", 136, 98), ("grass_tall_1_1", 182, 112)]
+FIREFLIES = [(112, 20, 0), (124, 64, 1), (300, 14, 2), (100, 42, 3), (296, 90, 4)]  # where each drifts about
 # the game's sprite directions by octant from east, clockwise (art/figures/frames.ts OCTANT): (dir, mirrored)
 OCTANT = [(2, False), (1, False), (0, False), (1, True), (2, True), (3, True), (4, False), (3, False)]
+WALK_STEP = 0.12  # s a walking frame (render/world/draw/kin.ts)
+SIGHT = (56, 30)  # how far a kin's sight lifts the night round him, flattened as the ground is seen
+
+# What happens, in frames of the loop (the flame's: nomads-sprites.json says how many, how long,
+# and when the woodcutter's log lands on the fire, STOKED):
+#   The woodcutter (kin 0) chops the small cherry, a swing every CHOP_EVERY; at the second blow an
+#   apple drops onto the head of the man under it (kin 6); the fifth fells it (west, away from
+#   him: render/world/draw/tree.ts falls it in FALL_TIME), and its log he takes up, carries to the
+#   fire and throws on (ANIM.TOSS, the log's flight render/fx-tools.ts EV.STOKE): it flares up,
+#   STOKED floats up, and the flame grows, lazier, and burns down again by the loop's end.
+#   The archer (kin 1) gets up from the fire, walks out, draws as a bow is drawn (frames.ts
+#   ACTIONS.draw: 0, 0.2, 0.5 s, loosed at BOW_DRAW_TIME 0.8 s) at the apple on the man's head
+#   and hits the man; he goes back to his seat.
+#   The man, hurt, shows his HP bar (draw/kin.ts healthBar), walks to the fire, sits, eats the
+#   apple and heals by it (render/fx.ts EV.HEAL's heart), the bar filling, gone once he is whole;
+#   then back under his tree, which has grown again as a stump puts out a shoot in the game.
+TREE_AT, TREE = (160, 72), "tree_3_1_2"  # the small cherry: it reads by night, and an apple may fall off it
+STUMP, LOG = "stump_3_1", "log_3_1_0"  # its stump, and its log lying, + the way it fell
+BLOSSOM = (236, 150, 186)  # its leaves flying as it falls
+CHOP_AT, MAN_AT, MAN_SEAT = (171, 74), (147, 77), (215, 84)  # where the woodcutter chops, the man stands and sits
+SEAT, SHOT = (208, 78), (182, 84)  # the archer's seat by the fire, and where he shoots from
+TOSS_AT = (204, 64)  # where the woodcutter throws his log from
+CHOP_FIRST, CHOP_EVERY, BLOWS = 2, 12, 5  # his first swing, a swing every so many frames, the blow that fells it
+APPLE_BLOW = 1  # the blow that shakes the apple down (counting from 0)
+CHOP = [(0, "chop0"), (0.11, "chop1"), (0.2, "chop2"), (0.32, "chop3"), (0.5, "idle0")]  # ACTIONS.chop, ACTION_END
+FALL_TIME, UPRIGHT, GROUND_Y = 0.7, 0.81, 0.58  # draw/tree.ts; art/props/trees.ts
+FALL_DIR = 4  # west: 0 east, clockwise in eighths
+LOG_ALONG = 12  # the log from the stump along the fall: LOG_GAP + logStep(1) / 2
+TOSS = [(0, "bend"), (0.175, "raise0"), (0.3, "raise1"), (0.5, "idle0")]  # ANIM.TOSS over TOSS_TIME
+LOG_FLIGHT, HAND_Z, LOG_SPIN, TOSS_FALL = 0.4, 16, 0.75, 260  # the thrown log: s in the air, from this high, turns, its fall
+# the archer: stands, walks out, draws, looses; walks back, sits
+UP, WALK_OUT, DRAWS, WALK_BACK, SITS = 24, 26, 37, 55, 66
+DRAW_FRAMES = [(0, "draw0"), (0.2, "draw1"), (0.5, "draw2"), (0.8, "idle0")]
+BOW_HAND = (-6, -8)  # where the arrow leaves him, aiming west, from his feet
+ARROW_FLIGHT = 3  # frames
+# the man: hit, walks to the fire, sits, eats, heals, gets up, walks back
+MAN_HP, MAN_HIT_HP = 3, 1
+MAN_WALKS, MAN_SITS, HEARTS, MAN_UP, MAN_BACK = 56, 76, (84, 100), 112, 136
+APPLE = [  # hand-pixelled, the game's way: a red apple, its shine, the stem and a leaf
+    "..sl",
+    ".rs.",
+    "rhrr",
+    "rrrr",
+    ".rr.",
+]
+APPLE_COLOURS = {"r": (210, 52, 44), "h": (255, 150, 132), "s": (107, 68, 35), "l": (90, 168, 60)}
 
 # Under the title how many play now, and lower down PLAY with a kinsman hopping on it as the
 # tribesmen on the game's loading curtain do (lobby/loading-row.ts and its hop-* keyframes):
 # standing, crouched with his hands down, up with his arms up 11 px, landing in the crouch. He
 # stands in the middle of it with a faint shadow under him; each landing presses it and each jump
-# lets it up. The button, his shadow and he are on the scene's grid, the word on it on the text's,
-# and he over the word; the curtain's 0.8 s is 12 frames here, ten hops a loop.
-HOPPER, HOP_FRAMES = 5, 12
+# lets it up; he is drawn over the word on it. The curtain's 0.8 s is ten frames.
+HOPPER = 5
 HOP_POSE = [(0, "idle0"), (0.12, "bend"), (0.22, "raise1"), (0.62, "bend"), (0.72, "idle0")]
 HOP_LIFT = [(0, 0), (0.24, 4), (0.29, 8), (0.35, 10), (0.43, 11), (0.51, 10), (0.56, 8), (0.60, 4), (0.62, 0)]
-BUTTON = (9, 70, 61, 83)  # game px: PLAY, its lip a pixel under it
-STAND_ON = 77  # the row of it his feet are on: its middle
-PLAY_SPACING = 2  # px between its letters, as the menu spaces them
+HOP_TIME = 0.8
+BUTTON = (12, 93, 82, 111)  # game px: PLAY, its lip a pixel under it
+STAND_ON = 102  # the row of it his feet are on: its middle
 
 
 def noise(x: int, y: int, seed: int) -> float:
@@ -306,35 +336,45 @@ def noise(x: int, y: int, seed: int) -> float:
 
 
 class Sheet:
-    """The exported sprites by name, each stamped with its anchor on the spot asked for."""
+    """The exported sprites by name, each stamped with its anchor on the spot asked for, and the flame's loop."""
 
     def __init__(self):
         self.im = Image.open(SRC / "nomads-sprites.png").convert("RGBA")
-        self.frames = json.loads((SRC / "nomads-sprites.json").read_text())
+        table = json.loads((SRC / "nomads-sprites.json").read_text())
+        self.frames, self.flame = table["sprites"], table["flame"]
         self.cache = {}
+        self.cache["apple", False, None] = (pixel_sprite(APPLE, APPLE_COLOURS), 2, 5)
 
     def get(self, name: str, flip: bool = False, tint=None):
         if (name, flip, tint) not in self.cache:
-            f = self.frames[name]
-            im = self.im.crop((f["x"], f["y"], f["x"] + f["w"], f["y"] + f["h"]))
+            if (name, False, None) in self.cache:  # drawn here rather than exported
+                im, ax, ay = self.cache[name, False, None]
+                w = im.width
+            else:
+                f = self.frames[name]
+                im = self.im.crop((f["x"], f["y"], f["x"] + f["w"], f["y"] + f["h"]))
+                ax, ay, w = f["ax"], f["ay"], f["w"]
             im = im.transpose(Image.FLIP_LEFT_RIGHT) if flip else im
             if tint:  # multiplied, as the game tints a sprite
                 im = ImageChops.multiply(im, Image.new("RGBA", im.size, (*tint, 255)))
-            ax = f["w"] - f["ax"] if flip else f["ax"]
-            self.cache[name, flip, tint] = (im, ax, f["ay"])
+            self.cache[name, flip, tint] = (im, w - ax if flip else ax, ay)
         return self.cache[name, flip, tint]
 
-    def turned(self, name: str, degrees: float) -> str:
-        """`name` turned `degrees` clockwise about its anchor (as a sprite's rotation in the game), kept as a sprite of its own."""
-        key = f"{name}@{round(degrees)}"
-        if key not in self.frames:
+    def turned(self, name: str, degrees: float, stretch: float = 1.0) -> str:
+        """`name` stretched upright by `stretch` and turned `degrees` clockwise about its anchor (as a
+        sprite's scale and rotation in the game), kept as a sprite of its own."""
+        key = f"{name}@{round(degrees)}x{round(stretch, 2)}"
+        if (key, False, None) not in self.cache:
             im, ax, ay = self.get(name)
-            big = Image.new("RGBA", (im.width * 2 + 2, im.height * 2 + 2))
-            cx, cy = big.width // 2, big.height // 2
+            if stretch != 1.0:
+                h = max(1, round(im.height * stretch))
+                im, ay = im.resize((im.width, h), Image.NEAREST), ay * h / im.height
+            side = 2 * max(im.width, im.height) + 2
+            big = Image.new("RGBA", (side, side))
+            cx = cy = side // 2
             big.alpha_composite(im, (round(cx - ax), round(cy - ay)))
             big = big.rotate(-round(degrees), Image.NEAREST, center=(cx, cy))
-            box = big.getbbox()
-            self.frames[key] = {"x": 0, "y": 0, "w": 0, "h": 0, "ax": cx - box[0], "ay": cy - box[1]}
+            box = big.getbbox() or (cx, cy, cx + 1, cy + 1)
             self.cache[key, False, None] = (big.crop(box), cx - box[0], cy - box[1])
         return key
 
@@ -345,6 +385,31 @@ class Sheet:
         cx, cy = max(0, -x0), max(0, -y0)
         if cx < im.width and cy < im.height:
             dst.alpha_composite(im, (x0 + cx, y0 + cy), (cx, cy))
+
+    def text(self, dst: Image.Image, s: str, x: float, y: float, colour) -> None:
+        """`s` in the game's pixel font, centred on x, its top at y (render/fx.ts floatText, art/font.ts)."""
+        x0 = round(x - (len(s) * 4 - 1) // 2)
+        for i, ch in enumerate(s):
+            if ch != " ":
+                self.put(dst, f"g_{ch}", x0 + i * 4, y, tint=colour)
+
+
+def pixel_sprite(rows: list[str], colours: dict) -> Image.Image:
+    """A little picture pixelled by hand, with the dark line round it every item of the game has."""
+    w, h = len(rows[0]) + 2, len(rows) + 2
+    im = Image.new("RGBA", (w, h))
+    px = im.load()
+    for j, row in enumerate(rows):
+        for i, ch in enumerate(row):
+            if ch != ".":
+                for dx, dy in ((-1, 0), (1, 0), (0, -1), (0, 1)):
+                    if px[i + 1 + dx, j + 1 + dy][3] == 0:
+                        px[i + 1 + dx, j + 1 + dy] = (*OUTLINE, 255)
+    for j, row in enumerate(rows):
+        for i, ch in enumerate(row):
+            if ch != ".":
+                px[i + 1, j + 1] = (*colours[ch], 255)
+    return im
 
 
 def smoothstep(a: float, b: float, x: float) -> float:
@@ -357,168 +422,331 @@ def stepped(keys: list, t: float):
     return [v for at, v in keys if at <= t][-1]
 
 
+def facing(dx: float, dy: float):
+    """The sprite direction and mirroring for a heading, as the game picks them (spriteDir)."""
+    return OCTANT[round(math.atan2(dy, dx) / (math.pi / 4)) % 8]
+
+
+def secs(frames: float) -> float:
+    return frames * NM_MS / 1000
+
+
+def frames_of(seconds: float) -> int:
+    """The nearest whole frame to `seconds` in (halves up)."""
+    return int(seconds * 1000 / NM_MS + 0.5)
+
+
+def walking(kin: int, f: int, start: int, end: int, a, b):
+    """Kin `kin` walking from `a` to `b` over frames `start` to `end`: (x, y, sprite, mirrored)."""
+    u = (f - start) / (end - start)
+    d, flip = facing(b[0] - a[0], b[1] - a[1])
+    step = int(secs(f - start) / WALK_STEP) % 4
+    return a[0] + (b[0] - a[0]) * u, a[1] + (b[1] - a[1]) * u, f"kin_{kin}_walk{step}_{d}", flip
+
+
+def blow_frames() -> list[int]:
+    """The frames the woodcutter's axe lands in: 0.2 s into each swing (SWING_WINDUP)."""
+    return [CHOP_FIRST + k * CHOP_EVERY + frames_of(0.2) for k in range(BLOWS)]
+
+
+def tree_state(f: int):
+    """The small cherry: standing (and how hard the axe shakes it), falling (how far), or felled."""
+    blows = blow_frames()
+    fell = blows[-1]
+    if f < fell:
+        since = [f - b for b in blows if 0 <= f - b < 3]
+        return "standing", (1 - since[0] / 3) if since else 0.0
+    k = secs(f - fell) / FALL_TIME
+    return ("falling", k) if k < 1 else ("felled", 0.0)
+
+
+def woodcutter_plan(stoked: int) -> dict:
+    """When the woodcutter does what after felling the tree, for the log to land at `stoked`."""
+    fell = blow_frames()[-1]
+    down = fell + frames_of(FALL_TIME)
+    leave = stoked - frames_of(LOG_FLIGHT)  # the log leaves his hands 0.175 s into the throw
+    return {"fell": fell, "down": down, "pick": down + 2, "carry": down + 6, "toss": leave - 2, "leave": leave,
+            "back": stoked + 3, "home": stoked + 15}
+
+
+def woodcutter_at(f: int, stoked: int):
+    """The woodcutter in frame `f`: (x, y, sprite, mirrored, holding the log)."""
+    p = woodcutter_plan(stoked)
+    fell, pick, carry, toss, back, home = p["fell"], p["pick"], p["carry"], p["toss"], p["back"], p["home"]
+    lx, ly = TREE_AT[0] - LOG_ALONG, TREE_AT[1]
+    if f < fell + 3:  # at the tree, swinging
+        swing = (f - CHOP_FIRST) % CHOP_EVERY if f >= CHOP_FIRST else CHOP_EVERY
+        frame = stepped(CHOP, secs(swing)) if swing < CHOP_EVERY else "idle0"
+        return *CHOP_AT, f"kin_0_{frame}_2", True, False
+    if f < pick:  # watching it fall
+        return *CHOP_AT, "kin_0_idle0_2", True, False
+    if f < carry:  # over the log, taking it up
+        d, flip = facing(lx - CHOP_AT[0], ly - CHOP_AT[1])
+        return *CHOP_AT, f"kin_0_bend_{d}", flip, False
+    if f < toss:
+        return *walking(0, f, carry, toss, CHOP_AT, TOSS_AT), True
+    if f < back:  # the throw: down for it, then up over his head and away
+        d, flip = facing(FIRE[0] - TOSS_AT[0], FIRE[1] - TOSS_AT[1])
+        return *TOSS_AT, f"kin_0_{stepped(TOSS, secs(f - toss))}_{d}", flip, f < p["leave"]
+    if f < home:
+        return *walking(0, f, back, home, TOSS_AT, CHOP_AT), False
+    return *CHOP_AT, "kin_0_idle0_2", True, False
+
+
+def archer_at(f: int):
+    """The archer in frame `f`: (x, y, sprite, mirrored)."""
+    if f < UP or f >= SITS:
+        return *SEAT, "kin_1_sit_2", False  # by the fire, facing it
+    if WALK_OUT <= f < DRAWS:
+        return walking(1, f, WALK_OUT, DRAWS, SEAT, SHOT)
+    if WALK_BACK <= f < SITS:
+        return walking(1, f, WALK_BACK, SITS, SHOT, SEAT)
+    x, y = SEAT if f < WALK_OUT else SHOT
+    d, flip = facing(MAN_AT[0] - x, MAN_AT[1] - y)
+    frame = stepped(DRAW_FRAMES, secs(f - DRAWS)) if DRAWS <= f else "idle0"
+    return x, y, f"kin_1_{frame}_{d}", flip
+
+
+def looses() -> int:
+    return DRAWS + frames_of(0.8)
+
+
+def man_at(f: int):
+    """The man under the tree in frame `f`: (x, y, sprite, mirrored, hit points)."""
+    hit = looses() + ARROW_FLIGHT
+    hp = MAN_HP if f < hit else MAN_HIT_HP + sum(1 for h in HEARTS if f >= h)
+    breath = "idle0" if (f // 8) % 2 == 0 else "idle1"
+    if f < MAN_WALKS or f >= MAN_BACK:
+        return *MAN_AT, f"kin_6_{breath}_0", False, min(hp, MAN_HP)
+    if f < MAN_SITS:
+        return *walking(6, f, MAN_WALKS, MAN_SITS, MAN_AT, MAN_SEAT), hp
+    if f < MAN_UP:
+        d, flip = facing(FIRE[0] - MAN_SEAT[0], FIRE[1] - MAN_SEAT[1])
+        return *MAN_SEAT, f"kin_6_sit_{d}", flip, hp
+    return *walking(6, f, MAN_UP, MAN_BACK, MAN_SEAT, MAN_AT), hp
+
+
 def nm_ground() -> Image.Image:
     """The glade's meadow, darker away from the camp, speckled with lighter grass."""
     im = Image.new("RGBA", (NM_W, NM_H))
     px = im.load()
     for y in range(NM_H):
         for x in range(NM_W):
-            dx, dy = (x - FIRE[0]) / 110, (y - FIRE[1]) / 60
+            dx, dy = (x - FIRE[0]) / 130, (y - FIRE[1]) / 70
             d = dx * dx + dy * dy + (noise(x, y, 7) - 0.5) * 0.18
             c = MEADOW[0 if d < 0.2 else 1 if d < 0.55 else 2 if d < 1.0 else 3]
             px[x, y] = (*((0x7A, 0xAD, 0x52) if noise(x, y, 3) < 0.04 else c), 255)
     return im
 
 
-def nm_sight() -> Image.Image:
-    """The night lifted round a kin, centred: what nm_light lays round the archer wherever he is."""
-    im = Image.new("L", (2 * SIGHT[0] + 1, 2 * SIGHT[1] + 1))
+def radial(rx: int, ry: int, peak: int, inner: float) -> Image.Image:
+    """A soft disc of light, flattened as the ground is seen, centred: 0..`peak` a pixel."""
+    im = Image.new("L", (2 * rx + 1, 2 * ry + 1))
     px = im.load()
     for y in range(im.height):
         for x in range(im.width):
-            d = math.hypot((x - SIGHT[0]) / SIGHT[0], (y - SIGHT[1]) / SIGHT[1])
-            px[x, y] = round(220 * (1 - smoothstep(0.3, 1.0, d)))
+            d = math.hypot((x - rx) / rx, (y - ry) / ry)
+            px[x, y] = round(peak * (1 - smoothstep(inner, 1.0, d)))
     return im
 
 
 def nm_masks():
-    """The fire's pool of light on the ground, the vignette and the glow's shape, 0..255 a pixel."""
-    pool, vignette, glow = (Image.new("L", (NM_W, NM_H)) for _ in range(3))
-    pp, vp, gp = pool.load(), vignette.load(), glow.load()
-    h = FLAME_TALL
+    """The vignette, and the fire's pool and a kin's sight as discs to lay where they are."""
+    vignette = Image.new("L", (NM_W, NM_H))
+    vp = vignette.load()
     for y in range(NM_H):
         for x in range(NM_W):
-            lx, ly = x - FIRE[0] + 0.5, y - FIRE[1] + 0.5
-            d = math.hypot(lx / POOL[0], ly / POOL[1])
-            pp[x, y] = round(255 * (1 - smoothstep(0.35, 1.0, d)))
             vx, vy = (x + 0.5) / NM_W - 0.5, ((y + 0.5) / NM_H - 0.5) * 0.85
             vp[x, y] = round(255 * (0.6 + 0.4 * smoothstep(0.62, 0.22, math.hypot(vx, vy))))
-            # the campfire glow's shader: a halo round the flame and a wide, flat one on the ground
+    pools = {k: radial(round(POOL[0] * (1 + (STOKED_LIGHT - 1) * k / 4)), round(POOL[1] * (1 + (STOKED_LIGHT - 1) * k / 4)), 255, 0.35)
+             for k in range(5)}
+    return vignette, pools, radial(*SIGHT, 220, 0.3)
+
+
+def glow_of(h: float) -> Image.Image:
+    """The campfire glow's shader for a flame `h` tall: a halo round it and a wide, flat one on the ground."""
+    rx, ry = round(h * 2.2), round(h * 1.6)
+    im = Image.new("L", (2 * rx + 1, 2 * ry + 1))
+    px = im.load()
+    for y in range(im.height):
+        for x in range(im.width):
+            lx, ly = x - rx + 0.5, y - ry + 0.5
             halo = max(1 - math.hypot(lx / (h * 1.2), (ly + h * 0.45) / (h * 1.05)), 0) ** 2.2
             ground = max(1 - math.hypot(lx / (h * 2.1), ly / (h * 0.8)), 0) ** 1.7 * 0.75
-            gp[x, y] = round(255 * max(halo, ground))
-    return pool, vignette, glow, nm_sight()
-
-
-def facing(dx: float, dy: float):
-    """The sprite direction and mirroring for a heading, as the game picks them (spriteDir)."""
-    return OCTANT[round(math.atan2(dy, dx) / (math.pi / 4)) % 8]
-
-
-def archer_at(f: int):
-    """Where the archer is in frame `f`, and his sprite: (x, y, name, mirrored)."""
-    (sx, sy), (hx, hy), (px, py), (rx, ry) = SEAT, SHOT, PICK_AT, RABBIT_AT
-    if f < UP or f >= SITS:
-        return sx, sy, f"kin_{ARCHER}_sit_2", False  # by the fire, facing it
-    walks = [(WALK_OUT, DRAWS, SEAT, SHOT), (WALK_ON, BENDS, SHOT, PICK_AT), (WALK_BACK, SITS, PICK_AT, SEAT)]
-    for start, end, (ax, ay), (bx, by) in walks:
-        if start <= f < end:
-            u = (f - start) / (end - start)
-            d, flip = facing(bx - ax, by - ay)
-            step = int((f - start) * NM_MS / 1000 / WALK_STEP) % 4
-            return ax + (bx - ax) * u, ay + (by - ay) * u, f"kin_{ARCHER}_walk{step}_{d}", flip
-    if BENDS <= f < WALK_BACK:
-        d, flip = facing(rx - px, ry - py)
-        return px, py, f"kin_{ARCHER}_bend_{d}", flip
-    x, y = (sx, sy) if f < WALK_OUT else (hx, hy)
-    d, flip = facing(rx - x, ry - y)
-    frame = "idle0"
-    for at, name in DRAW_FRAMES:
-        if DRAWS + at <= f < LOOSES:
-            frame = name
-    return x, y, f"kin_{ARCHER}_{frame}_{d}", flip
-
-
-def nm_hunt(sheet: Sheet, im: Image.Image, f: int, stand: list) -> None:
-    """The archer and the rabbit, frame `f`: what stands goes into `stand`, the shadows straight onto `im`."""
-    ax, ay, archer, flip = archer_at(f)
-    sheet.put(im, "shadow_m", ax, ay)
-    stand.append((ay, lambda: sheet.put(im, archer, ax, ay, flip)))
-    (fx, fy), (rx, ry) = RABBIT_FROM, RABBIT_AT
-    if RABBIT_IN <= f < HITS:  # hopping in, then sitting by the grass, turned to it
-        u = min(1.0, (f - RABBIT_IN) / (RABBIT_SITS - RABBIT_IN))
-        x, y = fx + (rx - fx) * u, fy + (ry - fy) * u
-        z = 0 if f >= RABBIT_SITS else abs(math.sin(u * math.pi * 6)) * 3
-        rabbit = "rabbit_0" if z < 1 else "rabbit_1"
-        tint = (255, 128, 128) if f == HITS - 1 else None  # the arrow lands: hurt, red for a moment
-        sheet.put(im, "shadow_s", x, y)
-        stand.append((y, lambda: sheet.put(im, rabbit, x, y - round(z), f >= RABBIT_SITS, tint)))
-    if LOOSES <= f < HITS:  # the arrow, straight at it, turned the way it flies as the game turns it
-        u = (f - LOOSES + 1) / (HITS - LOOSES)
-        sx, sy = SHOT[0] + BOW_HAND[0], SHOT[1] + BOW_HAND[1]
-        tx, ty = rx, ry - 4
-        arrow = sheet.turned("arrow", math.degrees(math.atan2(ty - sy, tx - sx)))
-        stand.append((ry + 1, lambda: sheet.put(im, arrow, sx + (tx - sx) * u, sy + (ty - sy) * u)))
-    if HITS <= f < TAKEN:  # its meat, bobbing as a drop does, until he picks it up
-        bob = round(math.sin((f - HITS) * NM_MS / 1000 * 4 + rx) * 0.6)
-        stand.append((ry, lambda: sheet.put(im, "res_0", rx, ry - 1 + bob)))
-
-
-def nm_blood(im: Image.Image, f: int) -> None:
-    """The blood a rabbit's death throws up (render/fx.ts: six specks, falling back)."""
-    age = (f - HITS) * NM_MS / 1000
-    if not 0 <= age < 0.5:
-        return
-    px = im.load()
-    rx, ry = RABBIT_AT
-    for i in range(6):
-        a = math.pi * (0.15 + 0.7 * noise(i, 5, 41))
-        v = 40 + 10 * noise(i, 6, 42)
-        x = rx + math.cos(a) * v * age * (1 if i % 2 else -1)
-        y = ry - 3 - math.sin(a) * v * age + 120 * age * age
-        for dx in (0, 1):
-            for dy in (0, 1):
-                if 0 <= x + dx < NM_W and 0 <= y + dy < NM_H:
-                    px[int(x + dx), int(y + dy)] = (176, 32, 40)
+            px[x, y] = round(255 * max(halo, ground))
+    return im
 
 
 def nm_scene(sheet: Sheet, ground: Image.Image, f: int) -> Image.Image:
     im = ground.copy()
-    stand = [(y, lambda n=n, x=x, y=y: sheet.put(im, n, x, y)) for n, x, y in TREES + TUFTS + [("grass_tall_1_1", *GRASS_AT)]]
+    stand = [(y, lambda n=n, x=x, y=y: sheet.put(im, n, x, y)) for n, x, y in TREES + TUFTS]
     for n, x, y in TREES:
         sheet.put(im, "shadow_tree", x, y)
-    for k, x, y, d, flip in CIRCLE:
+
+    def figure(x, y, name, flip):
         sheet.put(im, "shadow_m", x, y)
-        stand.append((y, lambda k=k, x=x, y=y, d=d, flip=flip: sheet.put(im, f"kin_{k}_sit_{d}", x, y, flip)))
-    nm_hunt(sheet, im, f, stand)
-    # their king on his horse beside them, turned to the fire, the horse breathing as in the game
-    sheet.put(im, "shadow_l", *KING_AT)
-    king = f"king_idle{f * KING_IDLE // NM_FRAMES}_{KING_DIR}"
-    stand.append((KING_AT[1], lambda: sheet.put(im, king, *KING_AT, True)))
+        stand.append((y, lambda: sheet.put(im, name, x, y, flip)))
+
+    for k, x, y, d, flip in CIRCLE:
+        figure(x, y, f"kin_{k}_sit_{d}", flip)
+    figure(*archer_at(f))
+    plan = woodcutter_plan(sheet.flame["stoked"])
+    x, y, name, flip, holding = woodcutter_at(f, sheet.flame["stoked"])
+    figure(x, y, name, flip)
+    if holding:  # the log in his arms, over his front
+        stand.append((y + 0.1, lambda x=x, y=y: sheet.put(im, "stoke_log", x, y - 9)))
+    x, y, name, flip, _ = man_at(f)
+    figure(x, y, name, flip)
+    # the small cherry: shaken by the axe, falling, or a stump with its log (until he takes it up)
+    state, k = tree_state(f)
+    tx, ty = TREE_AT
+    tree = TREE
+    if state == "standing":
+        sx = round(math.sin(secs(f) * 60) * k * 4)
+        sheet.put(im, "shadow_tree", tx, ty)
+        stand.append((ty, lambda: sheet.put(im, tree, tx + sx, ty)))
+    else:
+        stand.append((ty - 0.5, lambda: sheet.put(im, STUMP, tx, ty)))
+        if state == "falling":
+            # the crown swings down towards where it falls, turned and stretched as the game does
+            th = k * k * math.pi / 2
+            a = FALL_DIR * math.pi / 4
+            fx = math.cos(a) * math.sin(th) / UPRIGHT
+            fy = -math.cos(th) + math.sin(a) * math.sin(th) * GROUND_Y / UPRIGHT
+            turned = sheet.turned(tree, math.degrees(math.atan2(fx, -fy)), max(0.2, math.hypot(fx, fy)))
+            stand.append((ty, lambda: sheet.put(im, turned, tx, ty)))
+        elif f < plan["carry"]:  # its log, until he takes it up
+            stand.append((ty, lambda: sheet.put(im, f"{LOG}_{FALL_DIR}", tx - LOG_ALONG, ty)))
     stand.append((FIRE[1], lambda: sheet.put(im, "campfire", *FIRE)))
-    stand.append((FIRE[1] + 0.5, lambda: sheet.put(im, f"flame_{f % NM_FRAMES}", FIRE[0], FIRE[1] - 1)))
+    stand.append((FIRE[1] + 0.5, lambda: sheet.put(im, f"flame_{f}", FIRE[0], FIRE[1] - 1)))
+    king = f"king_idle{f * KING_IDLE // NM_FRAMES}_{KING_DIR}"
+    sheet.put(im, "shadow_l", *KING_AT)
+    stand.append((KING_AT[1], lambda: sheet.put(im, king, *KING_AT, True)))
     for _, draw in sorted(stand, key=lambda s: s[0]):
         draw()
     return im
 
 
-def nm_light(scene: Image.Image, masks, f: int) -> Image.Image:
-    pool, vignette, glow, sight = masks
+def stoke_share(sheet: Sheet, f: int) -> float:
+    """How far stoked the fire is in frame `f`, 0..1, by how tall the flame burns."""
+    tall = sheet.flame["tall"]
+    lo, hi = min(tall), max(tall)
+    return (tall[f] - lo) / (hi - lo) if hi > lo else 0.0
+
+
+def nm_light(sheet: Sheet, scene: Image.Image, masks, glows: dict, f: int) -> Image.Image:
+    vignette, pools, sight = masks
     t = 2 * math.pi * f / NM_FRAMES  # whole turns a loop, so the flicker wraps with it
-    flick = 0.86 + 0.09 * math.sin(14 * t + 1.3) + 0.05 * math.sin(34 * t + 3.9)
-    light = pool.point(lambda v: v * (0.92 + 0.08 * flick))
-    ax, ay, _, _ = archer_at(f)
-    seen = Image.new("L", scene.size)
-    seen.paste(sight, (round(ax) - SIGHT[0], round(ay) - 3 - SIGHT[1]))
-    light = ImageChops.lighter(light, seen)
+    flick = 0.86 + 0.09 * math.sin(18 * t + 1.3) + 0.05 * math.sin(43 * t + 3.9)
+    share = stoke_share(sheet, f)
+    light = Image.new("L", scene.size)
+    pool = pools[round(share * 4)].point(lambda v: v * (0.92 + 0.08 * flick))
+    light.paste(pool, (FIRE[0] - pool.width // 2, FIRE[1] - pool.height // 2))
+    # the night lifted round each kin out of the fire's light, as a kin's sight lifts it
+    for x, y, *_ in (archer_at(f), woodcutter_at(f, sheet.flame["stoked"]), man_at(f)):
+        seen = Image.new("L", scene.size)
+        seen.paste(sight, (round(x) - SIGHT[0], round(y) - 3 - SIGHT[1]))
+        light = ImageChops.lighter(light, seen)
     lit = Image.composite(Image.new("RGB", scene.size, LAMPLIGHT), Image.new("RGB", scene.size, NIGHT_FOG), light)
     lit = ImageChops.multiply(lit, Image.merge("RGB", [vignette] * 3))
     out = ImageChops.multiply(scene.convert("RGB"), lit)
-    k = GLOW * flick
-    g = glow.point(lambda v: v * k)
-    return ImageChops.add(out, ImageChops.multiply(Image.new("RGB", scene.size, GLOW_TINT), Image.merge("RGB", [g] * 3)))
+    h = round(sheet.flame["tall"][f])
+    if h not in glows:
+        glows[h] = glow_of(h)
+    g = glows[h].point(lambda v: v * GLOW * flick)
+    layer = Image.new("L", scene.size)
+    layer.paste(g, (FIRE[0] - g.width // 2, FIRE[1] - g.height // 2))
+    return ImageChops.add(out, ImageChops.multiply(Image.new("RGB", scene.size, GLOW_TINT), Image.merge("RGB", [layer] * 3)))
 
 
-def nm_embers(im: Image.Image, f: int) -> None:
-    """Sparks rising off the fire, each on a loop of its own that fits the card's."""
+def burst(im: Image.Image, f: int, start: int, at, n: int, speed: float, up: float, life: float, colour, seed: int, gravity: float = 120) -> None:
+    """A burst of specks thrown up from `at` in frame `start` and falling back (render/fx.ts burst)."""
+    age = secs(f - start)
+    if not 0 <= age < life:
+        return
     px = im.load()
-    for i in range(18):
+    for i in range(n):
+        a = math.pi * (0.1 + 0.8 * noise(i, start, seed))
+        v = speed * (0.6 + 0.4 * noise(i, start, seed + 1))
+        x = at[0] + math.cos(a) * v * age * (1 if noise(i, start, seed + 2) < 0.5 else -1)
+        y = at[1] - math.sin(a) * up * age + gravity * age * age
+        if 0 <= x < NM_W and 0 <= y < NM_H:
+            px[int(x), int(y)] = colour
+
+
+def nm_effects(sheet: Sheet, im: Image.Image, f: int) -> None:
+    """What flies, floats and shows over the world, unlit: chips, the apple, the arrow, blood, the
+    man's bar and hearts, the thrown log and the fire flaring up, STOKED, embers."""
+    tx, ty = TREE_AT
+    for b in blow_frames():
+        burst(im, f, b, (tx, ty - 6), 4, 55, 60, 0.5, (196, 150, 92), 51)  # fx_chip, fx_splinter
+    fell = blow_frames()[-1] + frames_of(FALL_TIME)
+    burst(im, f, fell, (tx - 14, ty), 10, 60, 50, 0.9, BLOSSOM, 52, 40)  # EV.TREE_FELL: its leaves
+    lit = im.convert("RGBA")
+    # the apple: shaken down at its blow onto the man's head, there until he eats it by the fire
+    mx, my, pose, _, hp = man_at(f)
+    drop = blow_frames()[APPLE_BLOW]
+    head = my - (15 if "_sit_" in pose else 19)
+    if drop <= f < HEARTS[0]:
+        age = secs(f - drop)
+        y = min(head, ty - 22 + 130 * age * age)
+        x = tx - 9 + (mx - (tx - 9)) * min(1.0, age / 0.3) if y < head else mx
+        sheet.put(lit, "apple", x, y)
+    # the arrow at the apple, into the man
+    loose = looses()
+    hit = loose + ARROW_FLIGHT
+    if loose <= f < hit:
+        u = (f - loose + 1) / ARROW_FLIGHT
+        sx, sy = SHOT[0] + BOW_HAND[0], SHOT[1] + BOW_HAND[1]
+        ex, ey = MAN_AT[0] + 2, MAN_AT[1] - 9
+        arrow = sheet.turned("arrow", math.degrees(math.atan2(ey - sy, ex - sx)))
+        sheet.put(lit, arrow, sx + (ex - sx) * u, sy + (ey - sy) * u)
+    # his bar while he is short of his most (healthBar: a dark bar with his HP across its middle)
+    if hit <= f and hp < MAN_HP:
+        d = ImageDraw.Draw(lit)
+        w = MAN_HP * 2
+        left, top = round(mx - w / 2), round(my - 25)
+        d.rectangle([left - 1, top, left + w, top + 2], fill=(*OUTLINE, 255))
+        d.rectangle([left, top + 1, left + round(w * hp / MAN_HP) - 1, top + 1], fill=(*HEAL, 255))
+    for h in HEARTS:  # EV.HEAL: a heart rising from over his head
+        age = secs(f - h)
+        if 0 <= age < 1:
+            sheet.put(lit, "fx_heart", MAN_SEAT[0], MAN_SEAT[1] - 14 - 14 * age)
+    # the woodcutter's log, thrown in an arc onto the fire, turning as it flies (render/fx.ts toss)
+    stoked = sheet.flame["stoked"]
+    leave = woodcutter_plan(stoked)["leave"]
+    if leave <= f < stoked:
+        t = secs(f - leave + 1)
+        u = min(1.0, t / LOG_FLIGHT)
+        x = TOSS_AT[0] + (FIRE[0] - TOSS_AT[0]) * u
+        y = TOSS_AT[1] + (FIRE[1] - 2 - TOSS_AT[1]) * u
+        z = HAND_Z + (TOSS_FALL * LOG_FLIGHT / 2 - HAND_Z / LOG_FLIGHT) * t - TOSS_FALL * t * t / 2
+        log = sheet.turned("stoke_log", 360 * LOG_SPIN * u)
+        sheet.put(lit, log, x, y - z)
+    im.paste(lit.convert("RGB"))
+    hit_at = (MAN_AT[0], MAN_AT[1] - 9)
+    burst(im, f, hit, hit_at, 3, 45, 50, 0.5, (176, 32, 40), 53)  # EV.HIT's blood
+    burst(im, f, stoked, (FIRE[0], FIRE[1] - 4), 18, 45, 100, 1.1, EMBER[2], 54, 60)  # LAND.FLARE: embers
+    burst(im, f, stoked, (FIRE[0], FIRE[1] - 6), 8, 40, 70, 0.5, EMBER[0], 55, 60)  # and sparks
+    age = secs(f - stoked)
+    if 0 <= age < 1.1 and (age < 0.7 or (f - stoked) % 2 == 0):  # STOKED floats up and fades
+        lit = im.convert("RGBA")
+        sheet.text(lit, "STOKED", FIRE[0], FIRE[1] - 26 - 14 * age, MEAT_LIGHT)
+        im.paste(lit.convert("RGB"))
+    nm_embers(sheet, im, f)
+
+
+def nm_embers(sheet: Sheet, im: Image.Image, f: int) -> None:
+    """Sparks rising off the fire, each on a loop of its own that fits the card's; more off a stoked one."""
+    px = im.load()
+    many = 18 + round(18 * stoke_share(sheet, f))
+    for i in range(many):
         life = 14 + int(noise(i, 1, 21) * 12)
         age = (f + i * 7) % NM_FRAMES
         if age >= life:
             continue
         u = age / life
-        x = FIRE[0] + (noise(i, 2, 22) - 0.5) * 8 + math.sin(u * 5 + i) * 3 * u
+        x = FIRE[0] + (noise(i, 2, 22) - 0.5) * 10 + math.sin(u * 5 + i) * 3 * u
         y = FIRE[1] - 6 - age * (0.9 + noise(i, 3, 23) * 0.6)
         if 0 <= x < NM_W and 0 <= y < NM_H:
             px[int(x), int(y)] = EMBER[min(len(EMBER) - 1, int(u * len(EMBER)))]
@@ -529,7 +757,7 @@ def nm_fireflies(im: Image.Image, f: int) -> None:
     px = im.load()
     for x0, y0, i in FIREFLIES:
         t = 2 * math.pi * (f / NM_FRAMES + noise(i, 4, 31))
-        glow = max(0.0, math.sin(t * 4 + i))  # four times a loop, dark half the time
+        glow = max(0.0, math.sin(t * 5 + i))  # five times a loop, dark half the time
         if glow < 0.15:
             continue
         x = round(x0 + 6 * math.sin(2 * t + i) + 2 * math.sin(6 * t))
@@ -543,14 +771,14 @@ def nm_fireflies(im: Image.Image, f: int) -> None:
 
 def hop_at(f: int):
     """The hopper's pose, how high he is, and whether his landing holds PLAY down."""
-    t = f % HOP_FRAMES / HOP_FRAMES
+    t = secs(f) % HOP_TIME / HOP_TIME
     pose = stepped(HOP_POSE, t)
     return pose, stepped(HOP_LIFT, t), pose == "bend"
 
 
 def nm_play(sheet: Sheet, im: Image.Image, f: int) -> None:
-    """PLAY and the hopper's shadow on it, on the scene's grid over the night (they are no part of it):
-    the game's shadow, smaller while he is high, as the curtain's shadow shrinks under him."""
+    """PLAY and the hopper's shadow on it, over the night (they are no part of it): the game's
+    shadow, smaller while he is high, as the curtain's shadow shrinks under him."""
     x0, y0, x1, y1 = BUTTON
     _, lift, down = hop_at(f)
     d = ImageDraw.Draw(im)
@@ -562,7 +790,7 @@ def nm_play(sheet: Sheet, im: Image.Image, f: int) -> None:
 
 
 def nm_hopper(sheet: Sheet, f: int) -> Image.Image:
-    """The kinsman hopping on PLAY, on the scene's grid, to be laid over the word on it."""
+    """The kinsman hopping on PLAY, to be laid over the word on it."""
     im = Image.new("RGBA", (NM_W, NM_H))
     pose, lift, down = hop_at(f)
     sheet.put(im, f"kin_{HOPPER}_{pose}_0", (BUTTON[0] + BUTTON[2] + 1) / 2, STAND_ON + down - lift)
@@ -583,24 +811,25 @@ def nm_text(f: int, players: int | None) -> Image.Image:
         put_text(d, x + 5, 50, "PLAYING NOW", MUTED)
     # the word in the middle of the button, sinking with it
     x0, y0, x1, y1 = (v * G / S for v in BUTTON)
-    down = hop_at(f)[2]
+    down = hop_at(f)[2] * G // S
     x = (x0 + x1 + G / S - big.getlength("PLAY") - 3 * PLAY_SPACING) / 2
     for ch in "PLAY":
         x = put_text(d, x, round((y0 + y1 + G / S) / 2 - 5) + down, ch, NM_INK, big) + PLAY_SPACING
     return im
 
 
-def nm_palette(scenes: list[Image.Image], text: list[Image.Image]) -> Image.Image:
+def nm_palette(scenes: list[Image.Image], over: list[Image.Image]) -> Image.Image:
     """The scene's shades by octree (it keeps the small bright ones, the crown's gold and the
     tribe's blue, that median cut gives up), then every colour of the text and the hopper as it
     is. The count's digits share their colour with the rest of the text, so a new count leaves the
     palette as it was and changes the GIF only where it is written."""
-    keep = sorted({c[:3] for im in text for _, c in im.getcolors(1 << 16) if c[3] == 255})
+    keep = sorted({c[:3] for im in over for _, c in im.getcolors(1 << 16) if c[3] == 255})
     mosaic = Image.new("RGB", (NM_W, NM_H * len(scenes)))
     for i, im in enumerate(scenes):
         mosaic.paste(im, (0, i * NM_H))
-    shades = mosaic.quantize(256 - len(keep), method=Image.Quantize.FASTOCTREE, dither=Image.Dither.NONE)
-    flat = shades.getpalette()[: 3 * (256 - len(keep))] + [v for c in keep for v in c]
+    room = 256 - len(keep)
+    shades = mosaic.quantize(room, method=Image.Quantize.FASTOCTREE, dither=Image.Dither.NONE)
+    flat = shades.getpalette()[: 3 * room] + [v for c in keep for v in c]
     pal = Image.new("P", (1, 1))
     pal.putpalette(flat)
     return pal
@@ -610,12 +839,11 @@ def nomads_card(stats: dict) -> tuple[list[Image.Image], Image.Image]:
     """The card's frames and their palette."""
     players = stats.get("nomads", {}).get("players")
     sheet = Sheet()
-    ground, masks = nm_ground(), nm_masks()
+    ground, masks, glows = nm_ground(), nm_masks(), {}
     frames, scenes, over = [], [], []
     for f in range(NM_FRAMES):
-        im = nm_light(nm_scene(sheet, ground, f), masks, f)
-        nm_blood(im, f)
-        nm_embers(im, f)
+        im = nm_light(sheet, nm_scene(sheet, ground, f), masks, glows, f)
+        nm_effects(sheet, im, f)
         nm_fireflies(im, f)
         nm_play(sheet, im, f)
         text, hopper = nm_text(f, players), nm_hopper(sheet, f)
