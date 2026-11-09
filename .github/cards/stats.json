@@ -5,17 +5,17 @@
       "1.20.2",
       "26.3"
     ],
-    "modrinth": 203,
-    "curseforge": 142
+    "modrinth": 204,
+    "curseforge": 144
   },
   "fleet": {
     "stars": 2,
     "forks": 1,
-    "releases": 38,
-    "downloads": 73,
-    "latest": "v0.2.23"
+    "releases": 41,
+    "downloads": 119,
+    "latest": "v0.2.26"
   },
   "nomads": {
-    "players": 0
+    "players": 4
   }
 }
