@@ -1,19 +1,19 @@
 {
   "headlab": {
-    "followers": 2,
+    "followers": 3,
     "mc": [
       "1.20.2",
       "26.3"
     ],
-    "modrinth": 216,
-    "curseforge": 159
+    "modrinth": 221,
+    "curseforge": 162
   },
   "fleet": {
     "stars": 2,
     "forks": 1,
-    "releases": 60,
-    "downloads": 207,
-    "latest": "v0.2.45"
+    "releases": 62,
+    "downloads": 221,
+    "latest": "v0.2.47"
   },
   "nomads": {
     "players": 0
